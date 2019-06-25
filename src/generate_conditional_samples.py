@@ -17,7 +17,8 @@ def interact_model(
     temperature=1,
     top_k=0,
     top_p=0.0,
-    prompt_path=None
+    prompt_path=None,
+    out_path=None
 ):
     """
     Interactively run the model
@@ -75,6 +76,7 @@ def interact_model(
                 return
             context_tokens = enc.encode(raw_text)
             generated = 0
+            all_text = []
             for _ in range(nsamples // batch_size):
                 out = sess.run(output, feed_dict={
                     context: [context_tokens for _ in range(batch_size)]
@@ -84,7 +86,10 @@ def interact_model(
                     text = enc.decode(out[i])
                     print("=" * 40 + " SAMPLE " + str(generated) + " " + "=" * 40)
                     print(text)
-            print("=" * 80)
+                    all_text.append(text)
+            with open(os.path.join(out_path, '%s-%s' % (model_name, os.path.basename(prompt_path))), 'w') as fp:
+                fp.write('\n'.join(all_text))
+
 
 if __name__ == '__main__':
     fire.Fire(interact_model)
