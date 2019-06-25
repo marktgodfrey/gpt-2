@@ -87,8 +87,9 @@ def interact_model(
                     print("=" * 40 + " SAMPLE " + str(generated) + " " + "=" * 40)
                     print(text)
                     all_text.append(text)
-            with open(os.path.join(out_path, '%s-%s' % (model_name, os.path.basename(prompt_path))), 'w') as fp:
-                fp.write('\n'.join(all_text))
+            if out_path:
+                with open(out_path, 'w') as fp:
+                    fp.write('\n'.join(all_text))
 
 
 if __name__ == '__main__':
