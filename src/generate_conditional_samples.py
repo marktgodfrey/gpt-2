@@ -84,9 +84,9 @@ def interact_model(
                 for i in range(batch_size):
                     generated += 1
                     text = enc.decode(out[i])
-                    print("=" * 40 + " SAMPLE " + str(generated) + " " + "=" * 40)
-                    print(text)
-                    all_text.append(text)
+                    separator = '=' * 40 + ' SAMPLE ' + str(generated) + ' ' + '=' * 40 + '\n'
+                    print(separator + text)
+                    all_text.append(separator + text)
             if out_path:
                 with open(out_path, 'w') as fp:
                     fp.write('\n'.join(all_text))
