@@ -83,6 +83,7 @@ def interact_model(
                 print('Number of tokens should be in range of 1 - ' + str(length) + ', got: ' + str(context_length) + '!')
                 continue
 
+            print('Processing context with ' + str(context_length) + ' tokens!')
             generated = 0
             for _ in range(nsamples // batch_size):
                 out = sess.run(output, feed_dict={
