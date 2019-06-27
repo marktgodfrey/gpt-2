@@ -17,6 +17,7 @@ def interact_model(
     temperature=1,
     top_k=0,
     top_p=0.0,
+    models_dir='models',
     prompt_path=None,
     out_path=None
 ):
@@ -44,9 +45,10 @@ def interact_model(
         batch_size = 1
     assert nsamples % batch_size == 0
 
-    enc = encoder.get_encoder(model_name)
+    models_dir = os.path.expanduser(os.path.expandvars(models_dir))
+    enc = encoder.get_encoder(model_name, models_dir)
     hparams = model.default_hparams()
-    with open(os.path.join('models', model_name, 'hparams.json')) as f:
+    with open(os.path.join(models_dir, model_name, 'hparams.json')) as f:
         hparams.override_from_dict(json.load(f))
 
     if length is None:
@@ -59,14 +61,17 @@ def interact_model(
         np.random.seed(seed)
         tf.set_random_seed(seed)
         output = sample.sample_sequence(
-            hparams=hparams, length=length,
+            hparams=hparams,
+            length=length,
             context=context,
             batch_size=batch_size,
-            temperature=temperature, top_k=top_k, top_p=top_p
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p
         )
 
         saver = tf.train.Saver()
-        ckpt = tf.train.latest_checkpoint(os.path.join('models', model_name))
+        ckpt = tf.train.latest_checkpoint(os.path.join(models_dir, model_name))
         saver.restore(sess, ckpt)
 
         with open(prompt_path, 'r') as fp:
