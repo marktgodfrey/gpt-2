@@ -51,8 +51,19 @@ def interact_model(
     with open(os.path.join(models_dir, model_name, 'hparams.json')) as f:
         hparams.override_from_dict(json.load(f))
 
+    context_tokens = []
+    with open(prompt_path, 'r') as fp:
+        raw_text = fp.read()
+        if not raw_text:
+            print('Prompt should not be empty!')
+            return
+        context_tokens = enc.encode(raw_text)
+
     if length is None:
-        length = hparams.n_ctx // 2
+        # length = hparams.n_ctx // 2
+        length = hparams.n_ctx - len(context_tokens)
+    elif len(context_tokens) > hparams.n_ctx - length:
+        raise ValueError("Can't get samples longer than window size - context: %s" % hparams.n_ctx - len(context_tokens))
     elif length > hparams.n_ctx:
         raise ValueError("Can't get samples longer than window size: %s" % hparams.n_ctx)
 
@@ -73,13 +84,6 @@ def interact_model(
         saver = tf.train.Saver()
         ckpt = tf.train.latest_checkpoint(os.path.join(models_dir, model_name))
         saver.restore(sess, ckpt)
-
-        with open(prompt_path, 'r') as fp:
-            raw_text = fp.read()
-            if not raw_text:
-                print('Prompt should not be empty!')
-                return
-            context_tokens = enc.encode(raw_text)
             generated = 0
             all_text = []
             for _ in range(nsamples // batch_size):
