@@ -76,7 +76,13 @@ def interact_model(
             while not raw_text:
                 print('Prompt should not be empty!')
                 raw_text = input("Model prompt >>> ")
+
             context_tokens = enc.encode(raw_text)
+            context_length = len(context_tokens)
+            if context_length <= 0 or context_length > length:
+                print('Number of tokens should be in range of 1 - ' + str(length) + ', got: ' + str(context_length) + '!')
+                continue
+
             generated = 0
             for _ in range(nsamples // batch_size):
                 out = sess.run(output, feed_dict={
