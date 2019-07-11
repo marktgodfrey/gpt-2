@@ -12,8 +12,8 @@ def interact_model(
     model_name='117M',
     seed=None,
     nsamples=1,
-    batch_size=1,
     length=None,
+    max_context_length=None,
     temperature=1,
     top_k=0,
     top_p=0.0,
@@ -27,9 +27,10 @@ def interact_model(
     :seed=None : Integer seed for random number generators, fix seed to reproduce
      results
     :nsamples=1 : Number of samples to return total
-    :batch_size=1 : Number of batches (only affects speed/memory).  Must divide nsamples.
     :length=None : Number of tokens in generated text, if None (default), is
      determined by model hyperparameters
+    :max_context_length=None : Number of tokens to use as context, affects
+     how much we'll generate each iteration
     :temperature=1 : Float value controlling randomness in boltzmann
      distribution. Lower temperature results in less random completions. As the
      temperature approaches zero, the model will become deterministic and
@@ -41,9 +42,6 @@ def interact_model(
     :top_p=0.0 : Float value controlling diversity. Implements nucleus sampling,
      overriding top_k if set to a value > 0. A good setting is 0.9.
     """
-    if batch_size is None:
-        batch_size = 1
-    assert nsamples % batch_size == 0
 
     models_dir = os.path.expanduser(os.path.expandvars(models_dir))
     enc = encoder.get_encoder(model_name, models_dir)
@@ -62,40 +60,59 @@ def interact_model(
     if length is None:
         # length = hparams.n_ctx // 2
         length = hparams.n_ctx - len(context_tokens)
-    elif len(context_tokens) > hparams.n_ctx - length:
-        raise ValueError("Can't get samples longer than window size - context: %s" % hparams.n_ctx - len(context_tokens))
-    elif length > hparams.n_ctx:
+    # elif len(context_tokens) > hparams.n_ctx - length:
+    #     raise ValueError("Can't get samples longer than window size - context: %s" % hparams.n_ctx - len(context_tokens))
+    # elif length > hparams.n_ctx:
+    #     raise ValueError("Can't get samples longer than window size: %s" % hparams.n_ctx)
+
+    if len(context_tokens) > hparams.n_ctx:
+        context_tokens = context_tokens[-hparams.n_ctx:]
+
+    if max_context_length is None:
+        max_context_length = hparams.n_ctx // 2
+    elif max_context_length > hparams.n_ctx:
         raise ValueError("Can't get samples longer than window size: %s" % hparams.n_ctx)
 
     with tf.Session(graph=tf.Graph()) as sess:
-        context = tf.placeholder(tf.int32, [batch_size, None])
+        context = tf.placeholder(tf.int32, [1, None])
         np.random.seed(seed)
         tf.set_random_seed(seed)
-        output = sample.sample_sequence(
-            hparams=hparams,
-            length=length,
-            context=context,
-            batch_size=batch_size,
-            temperature=temperature,
-            top_k=top_k,
-            top_p=top_p
-        )
 
         saver = tf.train.Saver()
         ckpt = tf.train.latest_checkpoint(os.path.join(models_dir, model_name))
         saver.restore(sess, ckpt)
+
         generated = 0
         all_text = []
-        for _ in range(nsamples // batch_size):
-            out = sess.run(output, feed_dict={
-                context: [context_tokens for _ in range(batch_size)]
-            })[:, len(context_tokens):]
-            for i in range(batch_size):
-                generated += 1
-                text = enc.decode(out[i])
-                separator = '=' * 40 + ' SAMPLE ' + str(generated) + ' ' + '=' * 40 + '\n'
-                print(separator + text)
-                all_text.append(separator + text)
+        for _ in range(nsamples):
+
+            generated_tokens = []
+            while len(generated_tokens) < length:
+                block_length = hparams.n_ctx - max_context_length
+                if len(generated_tokens) + block_length > length:
+                    block_length = length - len(generated_tokens)
+                output = sample.sample_sequence(
+                    hparams=hparams,
+                    length=block_length,
+                    context=context,
+                    batch_size=1,
+                    temperature=temperature,
+                    top_k=top_k,
+                    top_p=top_p
+                )
+                out = sess.run(output, feed_dict={
+                    context: [context_tokens[-(max_context_length):]]
+                })[:, len(context_tokens):]
+                # rotate context, newly generated context at the end
+                context_tokens[:max_context_length] = context_tokens[-(max_context_length):]
+                context_tokens[-block_length:] = out[0]
+                generated_tokens.append(out[0])
+
+            generated += 1
+            text = enc.decode(generated_tokens)
+            separator = '=' * 40 + ' SAMPLE ' + str(generated) + ' ' + '=' * 40 + '\n'
+            print(separator + text)
+            all_text.append(separator + text)
         if out_path:
             with open(out_path, 'w') as fp:
                 fp.write('\n'.join(all_text))
