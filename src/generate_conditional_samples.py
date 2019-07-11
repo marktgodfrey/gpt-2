@@ -102,7 +102,8 @@ def interact_model(
                 saver.restore(sess, ckpt)
                 out = sess.run(output, feed_dict={
                     context: [context_tokens[-max_context_length:]]
-                })[1, -block_length:]
+                })[0, -block_length:]
+
                 # rotate context, newly generated context at the end
                 context_tokens[:max_context_length] = context_tokens[-max_context_length:]
                 context_tokens[-block_length:] = out
