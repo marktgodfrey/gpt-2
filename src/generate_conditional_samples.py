@@ -101,12 +101,12 @@ def interact_model(
                 ckpt = tf.train.latest_checkpoint(os.path.join(models_dir, model_name))
                 saver.restore(sess, ckpt)
                 out = sess.run(output, feed_dict={
-                    context: [context_tokens[-(max_context_length):]]
-                })[:, len(context_tokens):]
+                    context: [context_tokens[-max_context_length:]]
+                })[1, -block_length:]
                 # rotate context, newly generated context at the end
-                context_tokens[:max_context_length] = context_tokens[-(max_context_length):]
-                context_tokens[-block_length:] = out[0]
-                generated_tokens.append(out[0])
+                context_tokens[:max_context_length] = context_tokens[-max_context_length:]
+                context_tokens[-block_length:] = out
+                generated_tokens.append(out)
                 print('generated %d of %d tokens' % (len(generated_tokens), length))
 
             generated += 1
