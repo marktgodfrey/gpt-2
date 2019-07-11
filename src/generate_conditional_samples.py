@@ -87,7 +87,7 @@ def interact_model(
                 block_length = hparams.n_ctx - max_context_length
                 if len(generated_tokens) + block_length > length:
                     block_length = length - len(generated_tokens)
-                print 'generating block of %d tokens' % block_length
+                print('generating block of %d tokens' % block_length)
                 output = sample.sample_sequence(
                     hparams=hparams,
                     length=block_length,
@@ -107,7 +107,7 @@ def interact_model(
                 context_tokens[:max_context_length] = context_tokens[-(max_context_length):]
                 context_tokens[-block_length:] = out[0]
                 generated_tokens.append(out[0])
-                print 'generated %d of %d tokens' % (len(generated_tokens), length)
+                print('generated %d of %d tokens' % (len(generated_tokens), length))
 
             generated += 1
             text = enc.decode(generated_tokens)
