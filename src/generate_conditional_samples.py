@@ -103,8 +103,8 @@ def interact_model(
                 out = sess.run(output, feed_dict={
                     context: [context_tokens[-max_context_length:]]
                 })[0, -block_length:]
-                print('generated %s (%d)', out, len(out))
-                # rotate context, newly generated context at the end
+                print('generated %s (%d)' % (out, len(out)))
+                # rotate context, newly generaed context at the end
                 context_tokens[:max_context_length] = context_tokens[-max_context_length:]
                 context_tokens[-block_length:] = out
                 generated_tokens.append(out)
