@@ -78,10 +78,6 @@ def interact_model(
         np.random.seed(seed)
         tf.set_random_seed(seed)
 
-        saver = tf.train.Saver()
-        ckpt = tf.train.latest_checkpoint(os.path.join(models_dir, model_name))
-        saver.restore(sess, ckpt)
-
         generated = 0
         all_text = []
         for _ in range(nsamples):
@@ -100,6 +96,9 @@ def interact_model(
                     top_k=top_k,
                     top_p=top_p
                 )
+                saver = tf.train.Saver()
+                ckpt = tf.train.latest_checkpoint(os.path.join(models_dir, model_name))
+                saver.restore(sess, ckpt)
                 out = sess.run(output, feed_dict={
                     context: [context_tokens[-(max_context_length):]]
                 })[:, len(context_tokens):]
