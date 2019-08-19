@@ -55,6 +55,7 @@ def interact_model(
         length = hparams.n_ctx // 2
     elif length > hparams.n_ctx:
         raise ValueError("Can't get samples longer than window size: %s" % hparams.n_ctx)
+    input_length = hparams.n_ctx - length
 
     with tf.Session(graph=tf.Graph()) as sess:
         context = tf.placeholder(tf.int32, [batch_size, None])
@@ -79,8 +80,8 @@ def interact_model(
 
             context_tokens = enc.encode(raw_text)
             context_length = len(context_tokens)
-            if context_length <= 0 or context_length > length:
-                print('Number of tokens should be in range of 1 - ' + str(length) + ', got: ' + str(context_length) + '!')
+            if context_length <= 0 or context_length > input_length:
+                print('Number of tokens should be in range of 1 - ' + str(input_length) + ', got: ' + str(context_length) + '!')
                 continue
 
             print('Processing context with ' + str(context_length) + ' tokens!')
