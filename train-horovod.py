@@ -16,15 +16,15 @@ import horovod.tensorflow as hvd
 import model, sample, encoder
 from load_dataset import load_dataset, Sampler
 
-CHECKPOINT_DIR = 'checkpoint'
-SAMPLE_DIR = 'samples'
-
 parser = argparse.ArgumentParser(
     description='Fine-tune GPT-2 on your custom dataset.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument('--dataset', metavar='PATH', type=str, required=True, help='Input file, directory, or glob pattern (utf-8 text, or preencoded .npz files).')
 parser.add_argument('--model_name', metavar='MODEL', type=str, default='117M', help='Pretrained model name')
+parser.add_argument('--models_dir', metavar='PATH', type=str, default='models', help='Path to parent folder containing model subfolders')
+parser.add_argument('--checkpoint_dir', metavar='PATH', type=str, default='checkpoint', help='Path to save model checkpoints')
+parser.add_argument('--samples_dir', metavar='PATH', type=str, default='samples', help='Path to save samples')
 parser.add_argument('--combine', metavar='CHARS', type=int, default=50000, help='Concatenate input files with <|endoftext|> separator into chunks of this minimum size')
 
 parser.add_argument('--batch_size', metavar='SIZE', type=int, default=1, help='Batch size')
@@ -67,7 +67,7 @@ def randomize(context, hparams, p):
 
 def main():
     args = parser.parse_args()
-    enc = encoder.get_encoder(args.model_name)
+    enc = encoder.get_encoder(args.model_name, args.models_dir)
     hparams = model.default_hparams()
     with open(os.path.join('models', args.model_name, 'hparams.json')) as f:
         hparams.override_from_dict(json.load(f))
@@ -138,7 +138,7 @@ def main():
         summaries = tf.summary.merge([summary_lr, summary_loss])
 
         summary_log = tf.summary.FileWriter(
-            os.path.join(CHECKPOINT_DIR, args.run_name))
+            os.path.join(args.checkpoint_dir, args.run_name))
 
         saver = tf.train.Saver(
             var_list=all_vars,
@@ -149,18 +149,21 @@ def main():
 
         if args.restore_from == 'latest':
             ckpt = tf.train.latest_checkpoint(
-                os.path.join(CHECKPOINT_DIR, args.run_name))
-            if ckpt is None:
-                # Get fresh GPT weights if new run.
-                ckpt = tf.train.latest_checkpoint(
-                    os.path.join('models', args.model_name))
+                os.path.join(args.checkpoint_dir, args.run_name))
+            # if ckpt is None:
+            #     # Get fresh GPT weights if new run.
+            #     ckpt = tf.train.latest_checkpoint(
+            #         os.path.join('models', args.model_name))
         elif args.restore_from == 'fresh':
             ckpt = tf.train.latest_checkpoint(
                 os.path.join('models', args.model_name))
         else:
             ckpt = tf.train.latest_checkpoint(args.restore_from)
-        print(str(hvd.local_rank()), 'Loading checkpoint', ckpt)
-        saver.restore(sess, ckpt)
+        if ckpt:
+            print(str(hvd.local_rank()), 'Loading checkpoint', ckpt)
+            saver.restore(sess, ckpt)
+        else:
+            print(str(hvd.local_rank()), 'No checkpoint, training from scratch!')
 
         bcast.run()
 
@@ -180,7 +183,7 @@ def main():
                            for _ in range(args.val_batch_count)]
 
         counter = 1
-        counter_path = os.path.join(CHECKPOINT_DIR, args.run_name, 'counter')
+        counter_path = os.path.join(args.checkpoint_dir, args.run_name, 'counter')
         if os.path.exists(counter_path):
             # Load the step number if we're resuming a run
             # Add 1 so we don't immediately try to save again
@@ -188,14 +191,14 @@ def main():
                 counter = int(fp.read()) + 1
 
         def save():
-            maketree(os.path.join(CHECKPOINT_DIR, args.run_name))
+            maketree(os.path.join(args.checkpoint_dir, args.run_name))
             print(
                 'Saving',
-                os.path.join(CHECKPOINT_DIR, args.run_name,
+                os.path.join(args.checkpoint_dir, args.run_name,
                              'model-{}').format(counter))
             saver.save(
                 sess,
-                os.path.join(CHECKPOINT_DIR, args.run_name, 'model'),
+                os.path.join(args.checkpoint_dir, args.run_name, 'model'),
                 global_step=counter)
             with open(counter_path, 'w') as fp:
                 fp.write(str(counter) + '\n')
@@ -214,9 +217,9 @@ def main():
                     all_text.append(text)
                     index += 1
             print(text)
-            maketree(os.path.join(SAMPLE_DIR, args.run_name))
+            maketree(os.path.join(args.samples_dir, args.run_name))
             with open(
-                    os.path.join(SAMPLE_DIR, args.run_name,
+                    os.path.join(args.samples_dir, args.run_name,
                                  'samples-{}').format(counter), 'w') as fp:
                 fp.write('\n'.join(all_text))
 
