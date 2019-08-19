@@ -65,29 +65,41 @@ def interact_model(
     # elif length > hparams.n_ctx:
     #     raise ValueError("Can't get samples longer than window size: %s" % hparams.n_ctx)
 
-    if len(context_tokens) > hparams.n_ctx:
-        context_tokens = context_tokens[-hparams.n_ctx:]
+    print('using context of length: %d' % len(context_tokens))
 
     if max_context_length is None:
         max_context_length = hparams.n_ctx // 2
     elif max_context_length > hparams.n_ctx:
         raise ValueError("Can't get samples longer than window size: %s" % hparams.n_ctx)
 
+    if len(context_tokens) > max_context_length:
+        print('context is too long! will be truncated...')
+
+    max_block_length = hparams.n_ctx - max_context_length
+
     with tf.Session(graph=tf.Graph()) as sess:
-        context = tf.placeholder(tf.int32, [1, None])
         np.random.seed(seed)
         tf.set_random_seed(seed)
+
+        ckpt = tf.train.latest_checkpoint(os.path.join(models_dir, model_name))
 
         generated = 0
         all_text = []
         for _ in range(nsamples):
 
             generated_tokens = []
+            context_buffer = None
             while len(generated_tokens) < length:
-                block_length = hparams.n_ctx - max_context_length
+                if not context_buffer:
+                    context_buffer = context_tokens[-hparams.n_ctx:]
+                context_length = min(max_context_length, len(context_buffer))
+                block_length = hparams.n_ctx - context_length
                 if len(generated_tokens) + block_length > length:
                     block_length = length - len(generated_tokens)
-                print('generating block of %d tokens' % block_length)
+                    context_length = hparams.n_ctx - block_length
+
+                print('generating block of %d tokens with context:\n%s' % (block_length, enc.decode(context_buffer[-context_length:])))
+                context = tf.placeholder(tf.int32, [1, None])
                 output = sample.sample_sequence(
                     hparams=hparams,
                     length=block_length,
@@ -98,20 +110,24 @@ def interact_model(
                     top_p=top_p
                 )
                 saver = tf.train.Saver()
-                ckpt = tf.train.latest_checkpoint(os.path.join(models_dir, model_name))
                 saver.restore(sess, ckpt)
                 out = sess.run(output, feed_dict={
-                    context: [context_tokens[-max_context_length:]]
+                    context: [context_buffer[-context_length:]]
                 })[0, -block_length:]
-                print('generated %s (%d)' % (out, len(out)))
-                # rotate context, newly generaed context at the end
-                context_tokens[:max_context_length] = context_tokens[-max_context_length:]
-                context_tokens[-block_length:] = out
-                generated_tokens.append(out)
+                print('generated:\n%s (%d)' % (enc.decode(out), len(out)))
+
+                if len(context_buffer) < hparams.n_ctx:
+                    context_buffer.extend(out) # should be at n_ctx now...
+                else:
+                    # rotate context, newly generated context at the end
+                    context_buffer[:context_length] = context_buffer[-context_length:]
+                    context_buffer[-block_length:] = out
+                generated_tokens.extend(out)
                 print('generated %d of %d tokens' % (len(generated_tokens), length))
 
             generated += 1
-            text = enc.decode(generated_tokens)
+            text = enc.decode(context_tokens)
+            text += enc.decode(generated_tokens)
             separator = '=' * 40 + ' SAMPLE ' + str(generated) + ' ' + '=' * 40 + '\n'
             print(separator + text)
             all_text.append(separator + text)
