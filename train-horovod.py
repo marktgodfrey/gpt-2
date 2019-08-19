@@ -134,8 +134,9 @@ def main():
         # training is started with random weights or restored from a checkpoint.
         bcast = hvd.broadcast_global_variables(0)
 
-        summary_lr = tf.summary.scalar('learning_rate', args.learning_rate)
-        summaries = tf.summary.merge([summary_lr, summary_loss])
+        # summary_lr = tf.summary.scalar('learning_rate', args.learning_rate)
+        # summaries = tf.summary.merge([summary_lr, summary_loss])
+        summaries = summary_loss
 
         summary_log = tf.summary.FileWriter(
             os.path.join(args.checkpoint_dir, args.run_name))
