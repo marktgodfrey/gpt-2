@@ -18,6 +18,8 @@ def interact_model(
     top_k=0,
     top_p=0.0,
     models_dir='models',
+    checkpoint_dir='checkpoint',
+    run_name='117M',
     prompt_path=None,
     out_path=None
 ):
@@ -81,7 +83,7 @@ def interact_model(
         np.random.seed(seed)
         tf.set_random_seed(seed)
 
-        ckpt = tf.train.latest_checkpoint(os.path.join(models_dir, model_name))
+        ckpt = tf.train.latest_checkpoint(os.path.join(checkpoint_dir, run_num))
 
         generated = 0
         all_text = []
