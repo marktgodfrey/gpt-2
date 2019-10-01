@@ -83,7 +83,7 @@ def interact_model(
         np.random.seed(seed)
         tf.set_random_seed(seed)
 
-        ckpt = tf.train.latest_checkpoint(os.path.join(checkpoint_dir, run_num))
+        ckpt = tf.train.latest_checkpoint(os.path.join(checkpoint_dir, run_name))
 
         generated = 0
         all_text = []
